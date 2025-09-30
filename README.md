@@ -11,3 +11,5 @@ huffman_project/
 ├── *main.c* - Só USA (chama) as funções, não as implementa
 
 └── *Makefile* - É um "SCRIPT DE MONTAGEM" automático e diz ao computador COMO juntar as peças
+
+### ⚠️​OBS: Por enquanto os códigos estão separados por blocos organizados com relação a construção completa do código dentro da pasta *separated_codes*
