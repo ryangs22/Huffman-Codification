@@ -24,12 +24,27 @@ struct No* criarNo(unsigned char simbolo, int frequencia) {
     // 3. Inicializar os campos do nó
     novoNo->simbolo = simbolo;
     novoNo->frequencia = frequencia;
-    novoNo->proximo = NULL;       // Próximo nó começa como NULL
-    novoNo->esquerdo = NULL;      // Ponteiro esquerdo vazio (para uso futuro na árvore)
-    novoNo->direito = NULL;       // Ponteiro direito vazio (para uso futuro na árvore)
+    novoNo->proximo = NULL;
+    novoNo->esquerdo = NULL;
+    novoNo->direito = NULL;
     
-    // 4. Retornar o novo nó criado
     return novoNo;
+}
+
+// Procedimento para contar frequências dos caracteres no arquivo
+void contarFrequenciasArquivo(FILE* arquivoEntrada, int frequencias[256]) {
+    int caractere;
+    
+    // 1. Inicializar todo o array com zeros
+    for (int i = 0; i < 256; i++) {
+        frequencias[i] = 0;
+    }
+    
+    // 2. Ler cada caractere do arquivo até o final
+    while ((caractere = fgetc(arquivoEntrada)) != EOF) {
+        // 3. Incrementar a frequência do caractere lido
+        frequencias[caractere]++;
+    }
 }
 
 // Função para inserir nó na lista mantendo a ordenação por frequência
@@ -43,7 +58,6 @@ struct No* inserirOrdenado(struct No* cabeca, struct No* novoNo) {
     // Caso 2: Percorrer a lista para encontrar posição correta
     struct No* atual = cabeca;
     
-    // Encontrar a posição onde a frequência do próximo nó é maior ou igual
     while (atual->proximo != NULL && atual->proximo->frequencia <= novoNo->frequencia) {
         atual = atual->proximo;
     }
@@ -55,29 +69,18 @@ struct No* inserirOrdenado(struct No* cabeca, struct No* novoNo) {
     return cabeca;
 }
 
-// Função para construir a lista de frequência a partir de um arquivo
-struct No* construirListaFrequencia(FILE* arquivoEntrada) {
-    // 1. Criar um array para contar frequências (256 possíveis valores de byte)
-    int frequencias[256] = {0};
-    unsigned char buffer;
-    
-    // 2. Ler o arquivo byte a byte e contar frequências
-    while (fread(&buffer, sizeof(unsigned char), 1, arquivoEntrada) == 1) {
-        frequencias[buffer]++;
-    }
-    
-    // 3. Reposicionar o ponteiro do arquivo para o início
-    rewind(arquivoEntrada);
-    
+// Função para construir a lista de frequência a partir do array de frequências
+struct No* construirListaFrequencia(int frequencias[256]) {
     struct No* cabeca = NULL;
     
-    // 4. Criar nós apenas para bytes que aparecem pelo menos uma vez
+    // 1. Percorrer todos os 256 valores possíveis de byte
     for (int i = 0; i < 256; i++) {
+        // 2. Verificar se o caractere aparece pelo menos uma vez
         if (frequencias[i] > 0) {
-            // 5. Criar novo nó para o símbolo com sua frequência
+            // 3. Criar novo nó para o símbolo com sua frequência
             struct No* novoNo = criarNo((unsigned char)i, frequencias[i]);
             
-            // 6. Inserir na lista mantendo ordenação por frequência
+            // 4. Inserir na lista mantendo ordenação por frequência
             cabeca = inserirOrdenado(cabeca, novoNo);
         }
     }
@@ -85,7 +88,7 @@ struct No* construirListaFrequencia(FILE* arquivoEntrada) {
     return cabeca;
 }
 
-// Função auxiliar para imprimir a lista de frequência (para debug)
+// Função auxiliar para imprimir a lista de frequência
 void imprimirListaFrequencia(struct No* cabeca) {
     struct No* atual = cabeca;
     printf("Lista de Frequência Ordenada:\n");
