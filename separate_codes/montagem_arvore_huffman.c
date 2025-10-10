@@ -6,7 +6,7 @@
  ============================================================================
  PARTE 1: CRIAÇÃO DA LISTA ENCADEADA DE FREQUÊNCIA E ORDENAÇÃO CRESCENTE
  ============================================================================
-
+ 
 
 // Estrutura do nó da lista de frequência
 struct No {
@@ -108,28 +108,28 @@ struct No* removerPrimeiroNo(struct No* cabeca) {
     return primeiro;
 }
 
-// Procedimento para construir a árvore de Huffman
-void construirArvoreHuffman(struct No** cabeca) {
-    // Continuar enquanto houver mais de 1 nó na lista (condição de parada)
-    while (*cabeca != NULL && (*cabeca)->proximo != NULL) {
+// Procedimento para construir a árvore de Huffman (SEM ponteiro para ponteiro)
+struct No* construirArvoreHuffman(struct No* cabeca) {
+    // Continuar enquanto houver mais de 1 nó na lista
+    while (cabeca != NULL && cabeca->proximo != NULL) {
         
         // Passo 1: Remover os dois primeiros nós da lista
-        struct No* primeiro = removerPrimeiroNo(*cabeca);
+        struct No* primeiro = removerPrimeiroNo(cabeca);
         
         // Atualizar cabeça após remover primeiro nó
         if (primeiro != NULL) {
-            *cabeca = primeiro->proximo;
+            cabeca = primeiro->proximo;
         } else {
-            *cabeca = NULL;
+            cabeca = NULL;
         }
         
-        struct No* segundo = removerPrimeiroNo(*cabeca);
+        struct No* segundo = removerPrimeiroNo(cabeca);
         
         // Atualizar cabeça após remover segundo nó
         if (segundo != NULL) {
-            *cabeca = segundo->proximo;
+            cabeca = segundo->proximo;
         } else {
-            *cabeca = NULL;
+            cabeca = NULL;
         }
         
         // Verificar se ambos os nós foram removidos com sucesso
@@ -142,14 +142,15 @@ void construirArvoreHuffman(struct No** cabeca) {
         struct No* novoNo = criarNo('*', primeiro->frequencia + segundo->frequencia);
         
         // Passo 3: Configurar os ponteiros esquerdo e direito
-        // O primeiro nó removido vai para a esquerda, o segundo para a direita
         novoNo->esquerdo = primeiro;
         novoNo->direito = segundo;
         
         // Passo 4: Inserir o novo nó de volta na lista ordenadamente
-        *cabeca = inserirOrdenado(*cabeca, novoNo);
+        cabeca = inserirOrdenado(cabeca, novoNo);
     }
-    // Ao final, *cabeca aponta para a raiz da árvore de Huffman
+    
+    // Retornar a nova cabeça (que será a raiz da árvore)
+    return cabeca;
 }
 
 // Procedimento para imprimir a árvore em PRÉ-ORDEM (com caractere de escape '\')
@@ -232,16 +233,16 @@ int main() {
     printf("=== LISTA DE FREQUÊNCIA ===\n");
     imprimirListaFrequencia(lista);
     
-    // PARTE 2: Construir árvore de Huffman com lógica intuitiva
+    // PARTE 2: Construir árvore de Huffman (SEM ponteiro para ponteiro)
     printf("\n=== CONSTRUINDO ÁRVORE DE HUFFMAN ===\n");
-    construirArvoreHuffman(&lista);
+    struct No* raiz = construirArvoreHuffman(lista);
     
     printf("\n=== ÁRVORE EM PRÉ-ORDEM ===\n");
-    imprimirArvorePreOrdem(lista);
+    imprimirArvorePreOrdem(raiz);
     printf("\n");
     
     // Liberar memória
-    liberarArvore(lista);
+    liberarArvore(raiz);
     
     return 0;
 }
