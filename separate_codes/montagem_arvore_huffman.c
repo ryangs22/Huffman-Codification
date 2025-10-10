@@ -96,13 +96,13 @@ struct No* construirListaFrequencia(int frequencias[256]) {
 */
 
 // Função para remover o primeiro nó da lista
-struct No* removerPrimeiroNo(struct No* cabeca) {
-    if (cabeca == NULL) {
+struct No* removerPrimeiroNo(struct No** cabeca) {
+    if (*cabeca == NULL) {
         return NULL;
     }
     
-    struct No* primeiro = cabeca;      // Primeiro nó a ser removido
-    cabeca = cabeca->proximo;          // Atualiza cabeça para o próximo
+    struct No* primeiro = *cabeca;      // Primeiro nó a ser removido
+    *cabeca = (*cabeca)->proximo;          // Atualiza cabeça para o próximo
     primeiro->proximo = NULL;          // Isola o nó removido
     
     return primeiro;
@@ -114,7 +114,7 @@ struct No* construirArvoreHuffman(struct No* cabeca) {
     while (cabeca != NULL && cabeca->proximo != NULL) {
         
         // Passo 1: Remover os dois primeiros nós da lista
-        struct No* primeiro = removerPrimeiroNo(cabeca);
+        struct No* primeiro = removerPrimeiroNo(&cabeca);
         
         // Atualizar cabeça após remover primeiro nó
         if (primeiro != NULL) {
@@ -123,7 +123,7 @@ struct No* construirArvoreHuffman(struct No* cabeca) {
             cabeca = NULL;
         }
         
-        struct No* segundo = removerPrimeiroNo(cabeca);
+        struct No* segundo = removerPrimeiroNo(&cabeca);
         
         // Atualizar cabeça após remover segundo nó
         if (segundo != NULL) {
