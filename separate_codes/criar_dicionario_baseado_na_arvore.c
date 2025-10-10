@@ -223,15 +223,15 @@ void calcularAlturaArvore(struct No* raiz, int* altura) {
         *altura = -1;
         return;
     }
-    
+   
     int alturaEsquerda, alturaDireita;
-    
+   
     // Calcular altura da subárvore esquerda
     calcularAlturaArvore(raiz->esquerdo, &alturaEsquerda);
-    
-    // Calcular altura da subárvore direita  
+   
+    // Calcular altura da subárvore direita
     calcularAlturaArvore(raiz->direito, &alturaDireita);
-    
+   
     // Determinar a maior altura
     if (alturaEsquerda > alturaDireita) {
         *altura = alturaEsquerda + 1;
@@ -245,7 +245,7 @@ void alocarDicionario(char* dicionario[256], int colunas) {
     for (int i = 0; i < 256; i++) {
         // Alocar cada linha com número específico de colunas
         dicionario[i] = (char*)malloc(colunas * sizeof(char));
-        
+       
         // Inicializar com string vazia
         if (dicionario[i] != NULL) {
             dicionario[i][0] = '\0';
@@ -253,35 +253,39 @@ void alocarDicionario(char* dicionario[256], int colunas) {
     }
 }
 
-// Função recursiva para gerar os códigos Huffman
-void gerarDicionarioRecursivo(char* dicionario[256], struct No* no, char concatenacao[], int profundidade) {
+// Função recursiva para gerar os códigos Huffman com segurança contra estouro
+void gerarDicionarioRecursivo(char* dicionario[256], struct No* no, char concatenacao[], int profundidade, int colunas) {
     if (no == NULL) {
         return;
     }
-    
+   
+    // Verifica se a profundidade excede o limite seguro
+    if (profundidade >= colunas - 1) {
+        printf("Erro: Profundidade excede o tamanho do dicionário.\n");
+        return;
+    }
+   
     // Se é nó folha, salvar o código no dicionário
     if (no->esquerdo == NULL && no->direito == NULL) {
         // Finalizar a string do código
         concatenacao[profundidade] = '\0';
-        
-        // Copiar o código para a posição correspondente no dicionário
-        int i;
-        for (i = 0; i <= profundidade; i++) {
-            dicionario[no->simbolo][i] = concatenacao[i];
-        }
+       
+        // Copiar o código para a posição correspondente no dicionário de forma segura
+        strncpy(dicionario[no->simbolo], concatenacao, colunas - 1);
+        dicionario[no->simbolo][colunas - 1] = '\0'; // Garante terminação
         return;
     }
-    
+   
     // Explorar subárvore esquerda (adiciona '0')
     if (no->esquerdo != NULL) {
         concatenacao[profundidade] = '0';
-        gerarDicionarioRecursivo(dicionario, no->esquerdo, concatenacao, profundidade + 1);
+        gerarDicionarioRecursivo(dicionario, no->esquerdo, concatenacao, profundidade + 1, colunas);
     }
-    
+   
     // Explorar subárvore direita (adiciona '1')
     if (no->direito != NULL) {
         concatenacao[profundidade] = '1';
-        gerarDicionarioRecursivo(dicionario, no->direito, concatenacao, profundidade + 1);
+        gerarDicionarioRecursivo(dicionario, no->direito, concatenacao, profundidade + 1, colunas);
     }
 }
 
@@ -289,9 +293,9 @@ void gerarDicionarioRecursivo(char* dicionario[256], struct No* no, char concate
 void gerarDicionario(char* dicionario[256], struct No* raiz, int colunas) {
     // Criar array temporário para construção dos códigos
     char concatenacao[colunas];
-    
+   
     // Iniciar a geração recursiva
-    gerarDicionarioRecursivo(dicionario, raiz, concatenacao, 0);
+    gerarDicionarioRecursivo(dicionario, raiz, concatenacao, 0, colunas);
 }
 
 // Função para liberar a memória do dicionário
@@ -309,13 +313,13 @@ void imprimirDicionario(char* dicionario[256]) {
     printf("=== DICIONÁRIO DE CÓDIGOS HUFFMAN ===\n");
     printf("Símbolo | Código\n");
     printf("--------|-------\n");
-    
+   
     for (int i = 0; i < 256; i++) {
         if (dicionario[i] != NULL && dicionario[i][0] != '\0') {
             if (i >= 32 && i <= 126) {
-                printf("   '%c'   |  %s\n", i, dicionario[i]);
+                printf(" '%c' | %s\n", i, dicionario[i]);
             } else {
-                printf("  0x%02X |  %s\n", i, dicionario[i]);
+                printf(" 0x%02X | %s\n", i, dicionario[i]);
             }
         }
     }
