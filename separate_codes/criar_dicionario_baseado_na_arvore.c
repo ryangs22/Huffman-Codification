@@ -7,7 +7,7 @@
  ============================================================================
  PARTE 1: CRIAÇÃO DA LISTA ENCADEADA DE FREQUÊNCIA E ORDENAÇÃO CRESCENTE
  ============================================================================
-*/
+
 
 // Estrutura do nó da lista de frequência
 struct No {
@@ -88,11 +88,13 @@ struct No* construirListaFrequencia(int frequencias[256]) {
     return cabeca;
 }
 
+*/
+
 /*
  ============================================================================
  PARTE 2: CONSTRUÇÃO DA ÁRVORE DE HUFFMAN
  ============================================================================
-*/
+
 
 // Função para remover o primeiro nó da lista
 struct No* removerPrimeiroNo(struct No* cabeca) {
@@ -206,6 +208,8 @@ void imprimirListaFrequencia(struct No* cabeca) {
         atual = atual->proximo;
     }
 }
+
+*/
 
 /*
  ============================================================================
