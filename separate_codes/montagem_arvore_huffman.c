@@ -2,6 +2,12 @@
 #include <stdlib.h>
 #include <locale.h>
 
+/*
+ ============================================================================
+ PARTE 1: CRIAÇÃO DA LISTA ENCADEADA DE FREQUÊNCIA E ORDENAÇÃO CRESCENTE
+ ============================================================================
+
+
 // Estrutura do nó da lista de frequência
 struct No {
     unsigned char simbolo;        // Caractere/símbolo (0x00 a 0xFF)
@@ -80,6 +86,8 @@ struct No* construirListaFrequencia(int frequencias[256]) {
     }
     return cabeca;
 }
+
+*/
 
 /*
  ============================================================================
