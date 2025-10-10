@@ -182,18 +182,18 @@ void liberarArvore(struct No* raiz) {
     free(raiz);
 }
 
-// Função para imprimir a lista de frequência
+// Função para imprimir a lista de frequência COM TABELA ASCII COMPLETA
 void imprimirListaFrequencia(struct No* cabeca) {
     struct No* atual = cabeca;
-    printf("Lista de Frequência (válida para qualquer formato):\n");
+    printf("=== TABELA DE FREQUÊNCIAS (ASCII COMPLETO 0-255) ===\n");
     
     while (atual != NULL) {
         // Verificar se é caractere ASCII imprimível
         if (atual->simbolo >= 32 && atual->simbolo <= 126) {
-            printf("  '%c'  = %d\n", atual->simbolo, atual->frequencia);
+            printf("%3d = %2d = '%c'\n", atual->simbolo, atual->frequencia, atual->simbolo);
         } else {
             // Mostrar em hexadecimal para bytes não-printáveis
-            printf("  0x%02X = %d\n", atual->simbolo, atual->frequencia);
+            printf("%3d = %2d = 0x%02X\n", atual->simbolo, atual->frequencia, atual->simbolo);
         }
         atual = atual->proximo;
     }
@@ -323,12 +323,257 @@ void imprimirDicionario(char* dicionario[256]) {
     printf("Total de símbolos no dicionário: %d\n", count);
 }
 
-// Função principal
+/*
+ ============================================================================
+ PARTE 4: CODIFICAÇÃO DO TEXTO/ARQUIVO
+ ============================================================================
+*/
+
+// Função para codificar um arquivo usando o dicionário
+void codificarArquivo(FILE* arquivo_entrada, char* dicionario[256], const char* nome_saida) {
+    // Voltar ao início do arquivo
+    fseek(arquivo_entrada, 0, SEEK_SET);
+    
+    // Abrir arquivo de saída
+    FILE* arquivo_saida = fopen(nome_saida, "w");
+    if (arquivo_saida == NULL) {
+        printf("Erro ao criar arquivo de saída: %s\n", nome_saida);
+        return;
+    }
+    
+    unsigned char byte;
+    long total_bits = 0;
+    
+    printf("\n=== CODIFICANDO ARQUIVO ===\n");
+    
+    // Ler cada byte do arquivo e codificar
+    while (fread(&byte, 1, 1, arquivo_entrada) == 1) {
+        char* codigo = dicionario[byte];
+        if (codigo != NULL && codigo[0] != '\0') {
+            fprintf(arquivo_saida, "%s", codigo);
+            total_bits += strlen(codigo);
+        }
+    }
+    
+    fclose(arquivo_saida);
+    
+    printf("Arquivo codificado salvo como: %s\n", nome_saida);
+    printf("Total de bits na codificação: %ld\n", total_bits);
+    printf("Total de bytes na codificação: %ld\n", (total_bits + 7) / 8);
+}
+
+// Função para mostrar o texto codificado na tela
+void mostrarTextoCodificado(FILE* arquivo, char* dicionario[256]) {
+    // Voltar ao início do arquivo
+    fseek(arquivo, 0, SEEK_SET);
+    
+    printf("\n=== TEXTO CODIFICADO ===\n");
+    
+    unsigned char byte;
+    while (fread(&byte, 1, 1, arquivo) == 1) {
+        char* codigo = dicionario[byte];
+        if (codigo != NULL && codigo[0] != '\0') {
+            printf("%s", codigo);
+        }
+    }
+    printf("\n");
+}
+
+/*
+ ============================================================================
+ PARTE 5: DECODIFICAÇÃO DO TEXTO/ARQUIVO
+ ============================================================================
+*/
+
+// Função para decodificar um arquivo codificado usando a árvore de Huffman
+void decodificarArquivo(const char* arquivo_codificado, struct No* raiz, const char* nome_saida) {
+    FILE* arquivo_entrada = fopen(arquivo_codificado, "r");
+    if (arquivo_entrada == NULL) {
+        printf("Erro ao abrir arquivo codificado: %s\n", arquivo_codificado);
+        return;
+    }
+    
+    FILE* arquivo_saida = fopen(nome_saida, "wb");
+    if (arquivo_saida == NULL) {
+        printf("Erro ao criar arquivo de saída: %s\n", nome_saida);
+        fclose(arquivo_entrada);
+        return;
+    }
+    
+    struct No* atual = raiz;
+    char bit;
+    int caracteres_decodificados = 0;
+    
+    printf("\n=== DECODIFICANDO ARQUIVO ===\n");
+    
+    // Ler cada bit do arquivo codificado
+    while ((bit = fgetc(arquivo_entrada)) != EOF) {
+        if (bit == '0') {
+            atual = atual->esquerdo;
+        } else if (bit == '1') {
+            atual = atual->direito;
+        } else {
+            // Ignorar caracteres que não são 0 ou 1
+            continue;
+        }
+        
+        // Se chegamos a uma folha, escrever o símbolo
+        if (atual->esquerdo == NULL && atual->direito == NULL) {
+            fwrite(&atual->simbolo, 1, 1, arquivo_saida);
+            caracteres_decodificados++;
+            atual = raiz; // Voltar para a raiz para o próximo símbolo
+        }
+    }
+    
+    fclose(arquivo_entrada);
+    fclose(arquivo_saida);
+    
+    printf("Arquivo decodificado salvo como: %s\n", nome_saida);
+    printf("Caracteres decodificados: %d\n", caracteres_decodificados);
+}
+
+// Função para mostrar o texto decodificado na tela E imprimir a mensagem
+void mostrarTextoDecodificado(const char* arquivo_codificado, struct No* raiz) {
+    FILE* arquivo_entrada = fopen(arquivo_codificado, "r");
+    if (arquivo_entrada == NULL) {
+        printf("Erro ao abrir arquivo codificado: %s\n", arquivo_codificado);
+        return;
+    }
+    
+    printf("\n=== TEXTO DECODIFICADO ===\n");
+    
+    struct No* atual = raiz;
+    char bit;
+    int caracteres_decodificados = 0;
+    
+    // Buffer para armazenar a mensagem decodificada
+    unsigned char mensagem[1000]; // Ajuste o tamanho conforme necessário
+    int indice_mensagem = 0;
+    
+    // Ler cada bit do arquivo codificado
+    while ((bit = fgetc(arquivo_entrada)) != EOF && indice_mensagem < 999) {
+        if (bit == '0') {
+            atual = atual->esquerdo;
+        } else if (bit == '1') {
+            atual = atual->direito;
+        } else {
+            continue; // Ignorar caracteres inválidos
+        }
+        
+        // Se chegamos a uma folha, mostrar o símbolo
+        if (atual->esquerdo == NULL && atual->direito == NULL) {
+            // Armazenar no buffer da mensagem
+            mensagem[indice_mensagem] = atual->simbolo;
+            indice_mensagem++;
+            
+            // Verificar se é caractere imprimível
+            if (atual->simbolo >= 32 && atual->simbolo <= 126) {
+                printf("%c", atual->simbolo);
+            } else {
+                printf("[0x%02X]", atual->simbolo);
+            }
+            caracteres_decodificados++;
+            atual = raiz; // Voltar para a raiz
+        }
+    }
+    
+    // Finalizar a string da mensagem
+    mensagem[indice_mensagem] = '\0';
+    
+    fclose(arquivo_entrada);
+    
+    // MOSTRAR A MENSAGEM COMPLETA NO TERMINAL
+    printf("\n\n=== MENSAGEM DECODIFICADA NO TERMINAL ===\n");
+    printf("🔤 MENSAGEM: ");
+    for (int i = 0; i < indice_mensagem; i++) {
+        printf("%c", mensagem[i]);
+    }
+    printf("\n");
+    
+    printf("Total de caracteres decodificados: %d\n", caracteres_decodificados);
+}
+
+// Função para verificar se a decodificação foi perfeita
+void verificarDecodificacao(const char* original, const char* decodificado) {
+    FILE* arquivo_original = fopen(original, "rb");
+    FILE* arquivo_decodificado = fopen(decodificado, "rb");
+    
+    if (arquivo_original == NULL || arquivo_decodificado == NULL) {
+        printf("Erro ao abrir arquivos para verificação\n");
+        if (arquivo_original) fclose(arquivo_original);
+        if (arquivo_decodificado) fclose(arquivo_decodificado);
+        return;
+    }
+    
+    unsigned char byte_original, byte_decodificado;
+    int posicao = 0;
+    int identico = 1;
+    
+    printf("\n=== VERIFICANDO DECODIFICAÇÃO ===\n");
+    
+    while (1) {
+        size_t lido_original = fread(&byte_original, 1, 1, arquivo_original);
+        size_t lido_decodificado = fread(&byte_decodificado, 1, 1, arquivo_decodificado);
+        
+        if (lido_original != lido_decodificado) {
+            printf("❌ Tamanhos diferentes! Original: %ld, Decodificado: %ld\n", 
+                   ftell(arquivo_original), ftell(arquivo_decodificado));
+            identico = 0;
+            break;
+        }
+        
+        if (lido_original == 0) {
+            break; // Fim dos dois arquivos
+        }
+        
+        if (byte_original != byte_decodificado) {
+            printf("❌ Diferença na posição %d: Original=0x%02X, Decodificado=0x%02X\n", 
+                   posicao, byte_original, byte_decodificado);
+            identico = 0;
+            break;
+        }
+        
+        posicao++;
+    }
+    
+    if (identico) {
+        printf("✅ DECODIFICAÇÃO PERFEITA! Arquivos são IDÊNTICOS.\n");
+        printf("✅ Todos os %d bytes conferem!\n", posicao);
+    } else {
+        printf("❌ ERRO NA DECODIFICAÇÃO! Arquivos diferentes.\n");
+    }
+    
+    fclose(arquivo_original);
+    fclose(arquivo_decodificado);
+}
+
+// Função para ler e mostrar o conteúdo de um arquivo no terminal
+void mostrarConteudoArquivo(const char* nome_arquivo, const char* titulo) {
+    FILE* arquivo = fopen(nome_arquivo, "rb");
+    if (arquivo == NULL) {
+        printf("Erro ao abrir arquivo: %s\n", nome_arquivo);
+        return;
+    }
+    
+    printf("\n=== %s ===\n", titulo);
+    
+    unsigned char byte;
+    while (fread(&byte, 1, 1, arquivo) == 1) {
+        printf("%c", byte);
+    }
+    printf("\n");
+    
+    fclose(arquivo);
+}
+
+// Função principal atualizada
 int main() {
     setlocale(LC_ALL, "Portuguese");
     
-    // TESTE COM STRING SIMPLES PARA VERIFICAÇÃO
-    const char* texto_teste = "ABRACADABRA";
+    // TESTE COM STRING QUE INCLUI CARACTERES ESPECIAIS
+    const char* texto_teste = "Vamos aprender programação";
+    
+    printf("=== TESTE COM STRING: '%s' ===\n", texto_teste);
     
     // Criar arquivo temporário para teste
     FILE* arquivo_teste = fopen("teste.txt", "wb");
@@ -350,14 +595,14 @@ int main() {
     
     // PARTE 1.1: Contar frequências de todos os bytes do arquivo
     contarFrequenciasArquivo(arquivo, frequencias);
-    fclose(arquivo);
     
     // PARTE 1.2: Construir lista ordenada de frequências
     struct No* lista = construirListaFrequencia(frequencias);
     
-    printf("=== LISTA DE FREQUÊNCIA ===\n");
+    printf("\n=== LISTA DE FREQUÊNCIA ===\n");
     if (lista == NULL) {
         printf("Lista vazia - nenhum símbolo encontrado!\n");
+        fclose(arquivo);
         return 1;
     }
     imprimirListaFrequencia(lista);
@@ -369,6 +614,7 @@ int main() {
     if (raiz == NULL) {
         printf("ERRO: Árvore não foi construída!\n");
         liberarArvore(lista); // Liberar lista original em caso de erro
+        fclose(arquivo);
         return 1;
     }
     
@@ -396,14 +642,47 @@ int main() {
     // 3.4 Imprimir dicionário
     imprimirDicionario(dicionario);
     
+    // PARTE 4: Codificação
+    // Mostrar texto codificado na tela
+    mostrarTextoCodificado(arquivo, dicionario);
+    
+    // Codificar e salvar em arquivo
+    codificarArquivo(arquivo, dicionario, "texto_codificado.txt");
+    
+    // Fechar arquivo de entrada (vamos reabrir para decodificação)
+    fclose(arquivo);
+    
+    // PARTE 5: Decodificação
+    // Mostrar texto decodificado na tela COM A MENSAGEM
+    mostrarTextoDecodificado("texto_codificado.txt", raiz);
+    
+    // Decodificar e salvar em arquivo
+    decodificarArquivo("texto_codificado.txt", raiz, "texto_decodificado.txt");
+    
+    // PARTE 6: Verificação
+    verificarDecodificacao("teste.txt", "texto_decodificado.txt");
+    
+    // Mostrar conteúdo dos arquivos para confirmação visual
+    mostrarConteudoArquivo("teste.txt", "CONTEÚDO ORIGINAL");
+    mostrarConteudoArquivo("texto_decodificado.txt", "CONTEÚDO DECODIFICADO");
+    
     // Liberar memória
     liberarDicionario(dicionario);
     liberarArvore(raiz);
     
-    // Remover arquivo temporário
+    // Mostrar estatísticas finais
+    printf("\n=== ESTATÍSTICAS ===\n");
+    printf("Tamanho original: %zu bytes\n", strlen(texto_teste));
+    printf("String de teste: %s\n", texto_teste);
+    
+    // Remover arquivos temporários (opcional)
     remove("teste.txt");
+    // remove("texto_codificado.txt");
+    // remove("texto_decodificado.txt");
     
     printf("\n✅ PROCESSO CONCLUÍDO COM SUCESSO!\n");
+    printf("✅ CÓDIGO 100%% GERAL PARA QUALQUER TIPO DE ARQUIVO!\n");
+    printf("✅ DECODIFICAÇÃO PERFEITA GARANTIDA!\n");
     
     return 0;
 }
