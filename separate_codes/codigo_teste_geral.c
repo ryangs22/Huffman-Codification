@@ -470,6 +470,187 @@ void mostrarConteudoArquivo(const char* nome_arquivo, const char* titulo) {
     fclose(arquivo);
 }
 
+/*
+ ============================================================================
+ PARTE 6: COMPACTAÇÃO DO ARQUIVO COM CABEÇALHO HUFFMAN
+ ============================================================================
+*/
+
+// Função para calcular quantos bits de lixo teremos no final
+int calcularBitsLixo(const char* arquivo_codificado) {
+    FILE *arquivo = fopen(arquivo_codificado, "r");
+    if (!arquivo) return 0;
+    
+    int total_bits = 0;
+    char bit;
+    
+    // Contar total de bits no arquivo codificado
+    while ((bit = fgetc(arquivo)) != EOF) {
+        if (bit == '0' || bit == '1') {
+            total_bits++;
+        }
+    }
+    
+    fclose(arquivo);
+    
+    // Calcular bits de lixo: 8 - (total_bits % 8)
+    int lixo = (8 - (total_bits % 8)) % 8;
+    return lixo;
+}
+
+// Função para calcular o tamanho da árvore em pré-ordem
+int calcularTamanhoArvore(struct No* raiz) {
+    if (raiz == NULL) return 0;
+    
+    // Cada nó ocupa 1 byte na representação
+    return 1 + calcularTamanhoArvore(raiz->esquerdo) + calcularTamanhoArvore(raiz->direito);
+}
+
+// Função para escrever a árvore em pré-ordem no arquivo
+void escreverArvorePreOrdem(struct No* raiz, FILE* arquivo) {
+    if (raiz == NULL) return;
+    
+    // Escrever o símbolo do nó
+    fwrite(&raiz->simbolo, sizeof(unsigned char), 1, arquivo);
+    
+    // Recursão para subárvores
+    escreverArvorePreOrdem(raiz->esquerdo, arquivo);
+    escreverArvorePreOrdem(raiz->direito, arquivo);
+}
+
+// Função principal de compactação com cabeçalho Huffman
+void compactarComCabecalho(const char* arquivo_codificado, struct No* raiz, const char* arquivo_compactado) {
+    FILE *entrada = fopen(arquivo_codificado, "r");
+    FILE *saida = fopen(arquivo_compactado, "wb");
+    
+    if (!entrada || !saida) {
+        printf("Erro ao abrir arquivos para compactação\n");
+        if (entrada) fclose(entrada);
+        if (saida) fclose(saida);
+        return;
+    }
+    
+    // CALCULAR VALORES DO CABEÇALHO
+    int lixo = calcularBitsLixo(arquivo_codificado);
+    int tamanho_arvore = calcularTamanhoArvore(raiz);
+    
+    printf("=== CABEÇALHO HUFFMAN ===\n");
+    printf("Bits de lixo: %d\n", lixo);
+    printf("Tamanho da árvore: %d\n", tamanho_arvore);
+    
+    // CONSTRUIR CABEÇALHO (16 bits = 3 bits lixo + 13 bits tamanho árvore)
+    unsigned short cabecalho = 0;
+    
+    // Colocar bits de lixo nos 3 primeiros bits
+    cabecalho |= (lixo & 0x07) << 13;
+    
+    // Colocar tamanho da árvore nos 13 bits seguintes
+    cabecalho |= (tamanho_arvore & 0x1FFF);
+    
+    // Escrever cabeçalho (2 bytes)
+    unsigned char byte1 = (cabecalho >> 8) & 0xFF;
+    unsigned char byte2 = cabecalho & 0xFF;
+    fwrite(&byte1, sizeof(unsigned char), 1, saida);
+    fwrite(&byte2, sizeof(unsigned char), 1, saida);
+    
+    // ESCREVER ÁRVORE EM PRÉ-ORDEM
+    escreverArvorePreOrdem(raiz, saida);
+    
+    // COMPACTAR DADOS CODIFICADOS
+    int j = 7;
+    unsigned char mascara, byte = 0;
+    char bit;
+    int bits_escritos = 0;
+    
+    while ((bit = fgetc(entrada)) != EOF) {
+        if (bit == '0' || bit == '1') {
+            mascara = 1;
+            
+            if (bit == '1') {
+                mascara = mascara << j;
+                byte = byte | mascara;
+            }
+            
+            j--;
+            bits_escritos++;
+            
+            if (j < 0) {
+                fwrite(&byte, sizeof(unsigned char), 1, saida);
+                byte = 0;
+                j = 7;
+            }
+        }
+    }
+    
+    // Escrever último byte se necessário
+    if (j != 7) {
+        fwrite(&byte, sizeof(unsigned char), 1, saida);
+    }
+    
+    fclose(entrada);
+    fclose(saida);
+    
+    printf("Arquivo compactado salvo como: %s\n", arquivo_compactado);
+    printf("Total de bits codificados: %d\n", bits_escritos);
+}
+
+// Função para mostrar o cabeçalho do arquivo compactado
+void mostrarCabecalhoCompactado(const char* arquivo_compactado) {
+    FILE *arquivo = fopen(arquivo_compactado, "rb");
+    if (!arquivo) {
+        printf("Erro ao abrir arquivo compactado\n");
+        return;
+    }
+    
+    printf("\n=== ESTRUTURA DO ARQUIVO COMPACTADO ===\n");
+    
+    // LER CABEÇALHO
+    unsigned char byte1, byte2;
+    fread(&byte1, sizeof(unsigned char), 1, arquivo);
+    fread(&byte2, sizeof(unsigned char), 1, arquivo);
+    
+    unsigned short cabecalho = (byte1 << 8) | byte2;
+    int lixo = (cabecalho >> 13) & 0x07;
+    int tamanho_arvore = cabecalho & 0x1FFF;
+    
+    printf("Cabeçalho (16 bits): ");
+    for (int i = 15; i >= 0; i--) {
+        printf("%d", (cabecalho >> i) & 1);
+        if (i == 13) printf(" ");
+    }
+    printf("\n");
+    
+    printf("Bits de lixo: %d (", lixo);
+    for (int i = 2; i >= 0; i--) {
+        printf("%d", (lixo >> i) & 1);
+    }
+    printf(")\n");
+    
+    printf("Tamanho da árvore: %d (", tamanho_arvore);
+    for (int i = 12; i >= 0; i--) {
+        printf("%d", (tamanho_arvore >> i) & 1);
+    }
+    printf(")\n");
+    
+    // LER E MOSTRAR ÁRVORE
+    printf("Árvore em pré-ordem (%d bytes): ", tamanho_arvore);
+    for (int i = 0; i < tamanho_arvore; i++) {
+        unsigned char simbolo;
+        fread(&simbolo, sizeof(unsigned char), 1, arquivo);
+        
+        if (simbolo == '*') {
+            printf("*");
+        } else if (simbolo >= 32 && simbolo <= 126) {
+            printf("%c", simbolo);
+        } else {
+            printf("[0x%02X]", simbolo);
+        }
+    }
+    printf("\n");
+    
+    fclose(arquivo);
+}
+
 // Função principal atualizada
 int main() {
     setlocale(LC_ALL, "Portuguese");
@@ -549,6 +730,11 @@ int main() {
     
     // Fechar arquivo de entrada
     fclose(arquivo);
+
+    // PARTE 6: COMPACTAÇÃO COM CABEÇALHO
+    printf("\n");
+    compactarComCabecalho("texto_codificado.txt", raiz, "compactado.huff");
+    mostrarCabecalhoCompactado("compactado.huff");
     
     // PARTE 5: Decodificação
     // PRINT 5: Texto decodificado
