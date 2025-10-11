@@ -450,53 +450,6 @@ void mostrarTextoDecodificado(const char* arquivo_codificado, struct No* raiz) {
     remove("temp_decodificado.txt");
 }
 
-// Função para verificar se a decodificação foi perfeita
-void verificarDecodificacao(const char* original, const char* decodificado) {
-    FILE* arquivo_original = fopen(original, "rb");
-    FILE* arquivo_decodificado = fopen(decodificado, "rb");
-    
-    if (arquivo_original == NULL || arquivo_decodificado == NULL) {
-        printf("Erro ao abrir arquivos para verificação\n");
-        if (arquivo_original) fclose(arquivo_original);
-        if (arquivo_decodificado) fclose(arquivo_decodificado);
-        return;
-    }
-    
-    unsigned char byte_original, byte_decodificado;
-    int posicao = 0;
-    int identico = 1;
-    
-    while (1) {
-        size_t lido_original = fread(&byte_original, 1, 1, arquivo_original);
-        size_t lido_decodificado = fread(&byte_decodificado, 1, 1, arquivo_decodificado);
-        
-        if (lido_original != lido_decodificado) {
-            identico = 0;
-            break;
-        }
-        
-        if (lido_original == 0) {
-            break; // Fim dos dois arquivos
-        }
-        
-        if (byte_original != byte_decodificado) {
-            identico = 0;
-            break;
-        }
-        
-        posicao++;
-    }
-    
-    if (identico) {
-        printf("DECODIFICAÇÃO PERFEITA! Arquivos são IDÊNTICOS.\n");
-        printf("Todos os %d bytes conferem!\n", posicao);
-    } else {
-        printf("ERRO NA DECODIFICAÇÃO! Arquivos diferentes.\n");
-    }
-    
-    fclose(arquivo_original);
-    fclose(arquivo_decodificado);
-}
 
 // Função para ler e mostrar o conteúdo de um arquivo no terminal
 void mostrarConteudoArquivo(const char* nome_arquivo, const char* titulo) {
