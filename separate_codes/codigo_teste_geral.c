@@ -651,6 +651,199 @@ void mostrarCabecalhoCompactado(const char* arquivo_compactado) {
     fclose(arquivo);
 }
 
+/*
+ ============================================================================
+ PARTE 7: DESCOMPACTAÇÃO GERAL PARA QUALQUER TIPO DE ARQUIVO
+ ============================================================================
+*/
+
+// Função para ler cabeçalho do arquivo compactado
+void lerCabecalhoCompactado(FILE* arquivo, int* lixo, int* tamanho_arvore) {
+    unsigned char byte1, byte2;
+    
+    // Ler os 2 bytes do cabeçalho
+    size_t lido1 = fread(&byte1, 1, 1, arquivo);
+    size_t lido2 = fread(&byte2, 1, 1, arquivo);
+    
+    if (lido1 != 1 || lido2 != 1) {
+        printf("Erro: Não foi possível ler o cabeçalho do arquivo compactado\n");
+        *lixo = 0;
+        *tamanho_arvore = 0;
+        return;
+    }
+    
+    // Montar cabeçalho de 16 bits
+    unsigned short cabecalho = (byte1 << 8) | byte2;
+    
+    // Extrair 3 bits de lixo (bits 13-15)
+    *lixo = (cabecalho >> 13) & 0x07;
+    
+    // Extrair 13 bits do tamanho da árvore (bits 0-12)
+    *tamanho_arvore = cabecalho & 0x1FFF;
+}
+
+// Função para pular a árvore no arquivo compactado
+void pularArvoreCompactada(FILE* arquivo, int tamanho_arvore) {
+    // Pular os bytes da árvore em pré-ordem
+    fseek(arquivo, tamanho_arvore, SEEK_CUR);
+}
+
+// Função principal de descompactação geral
+void descompactarArquivoGeral(const char* arquivo_compactado, struct No* raiz, const char* arquivo_saida) {
+    FILE *entrada = fopen(arquivo_compactado, "rb");
+    if (!entrada) {
+        printf("Erro ao abrir arquivo compactado: %s\n", arquivo_compactado);
+        return;
+    }
+    
+    FILE *saida = fopen(arquivo_saida, "wb");
+    if (!saida) {
+        printf("Erro ao criar arquivo de saída: %s\n", arquivo_saida);
+        fclose(entrada);
+        return;
+    }
+    
+    // LER CABEÇALHO
+    int lixo, tamanho_arvore;
+    lerCabecalhoCompactado(entrada, &lixo, &tamanho_arvore);
+    
+    if (tamanho_arvore == 0) {
+        printf("Erro: Cabeçalho inválido ou arquivo corrompido\n");
+        fclose(entrada);
+        fclose(saida);
+        return;
+    }
+    
+    // PULAR ÁRVORE NO ARQUIVO (já temos a árvore na memória)
+    pularArvoreCompactada(entrada, tamanho_arvore);
+    
+    // CALCULAR TAMANHO DOS DADOS COMPACTADOS
+    long posicao_atual = ftell(entrada);
+    fseek(entrada, 0, SEEK_END);
+    long tamanho_total = ftell(entrada);
+    fseek(entrada, posicao_atual, SEEK_SET);
+    
+    long bytes_dados = tamanho_total - posicao_atual;
+    long total_bits_uteis = bytes_dados * 8 - lixo;
+    
+    printf("\n=== DESCOMPACTANDO ARQUIVO (MODO GERAL) ===\n");
+    printf("Bits de lixo: %d\n", lixo);
+    printf("Tamanho da árvore: %d bytes\n", tamanho_arvore);
+    printf("Bytes de dados compactados: %ld\n", bytes_dados);
+    printf("Total de bits úteis: %ld\n", total_bits_uteis);
+    
+    // DESCOMPACTAR DADOS USANDO A ÁRVORE
+    struct No* atual = raiz;
+    unsigned char byte;
+    long bits_processados = 0;
+    long bytes_escritos = 0;
+    
+    // Buffer para leitura eficiente de arquivos grandes
+    unsigned char buffer[8192];
+    size_t bytes_lidos;
+    int buffer_pos = 0;
+    int buffer_size = 0;
+    
+    // Ler arquivo em chunks para eficiência com arquivos grandes
+    while ((bytes_lidos = fread(buffer, 1, sizeof(buffer), entrada)) > 0) {
+        buffer_size = bytes_lidos;
+        buffer_pos = 0;
+        
+        // Processar cada byte do buffer
+        while (buffer_pos < buffer_size && bits_processados < total_bits_uteis) {
+            byte = buffer[buffer_pos++];
+            
+            // Processar cada bit do byte (do mais significativo para o menos)
+            for (int i = 7; i >= 0; i--) {
+                // Verificar se não ultrapassamos os bits úteis
+                if (bits_processados >= total_bits_uteis) {
+                    break;
+                }
+                
+                // Verificar se o bit atual é 1 usando máscara
+                if (byte & (1 << i)) {
+                    atual = atual->direito;  // Bit 1 - vai para direita
+                } else {
+                    atual = atual->esquerdo; // Bit 0 - vai para esquerda
+                }
+                
+                bits_processados++;
+                
+                // Se chegou em uma folha, escrever o símbolo e voltar para raiz
+                if (atual->esquerdo == NULL && atual->direito == NULL) {
+                    fwrite(&atual->simbolo, 1, 1, saida);
+                    bytes_escritos++;
+                    atual = raiz; // Voltar para raiz para próximo símbolo
+                }
+            }
+        }
+        
+        // Mostrar progresso para arquivos grandes
+        if (bytes_escritos % 10000 == 0) {
+            printf("Progresso: %ld bytes descompactados...\n", bytes_escritos);
+        }
+    }
+    
+    fclose(entrada);
+    fclose(saida);
+    
+    printf("Descompactação concluída!\n");
+    printf("Total de bytes descompactados: %ld\n", bytes_escritos);
+    printf("Arquivo salvo como: %s\n", arquivo_saida);
+}
+
+// Função para verificar integridade da descompactação
+void verificarDescompactacao(const char* original, const char* descompactado) {
+    FILE *arq_original = fopen(original, "rb");
+    FILE *arq_descompactado = fopen(descompactado, "rb");
+    
+    if (!arq_original || !arq_descompactado) {
+        printf("Erro ao abrir arquivos para verificação\n");
+        if (arq_original) fclose(arq_original);
+        if (arq_descompactado) fclose(arq_descompactado);
+        return;
+    }
+    
+    unsigned char byte_original, byte_descompactado;
+    long posicao = 0;
+    int identico = 1;
+    
+    // Comparar byte a byte
+    while (1) {
+        size_t lido_original = fread(&byte_original, 1, 1, arq_original);
+        size_t lido_descompactado = fread(&byte_descompactado, 1, 1, arq_descompactado);
+        
+        if (lido_original != lido_descompactado) {
+            printf("❌ Tamanhos diferentes! Posição: %ld\n", posicao);
+            identico = 0;
+            break;
+        }
+        
+        if (lido_original == 0) {
+            break; // Fim dos dois arquivos
+        }
+        
+        if (byte_original != byte_descompactado) {
+            printf("❌ Diferença na posição %ld: Original=0x%02X, Descompactado=0x%02X\n", 
+                   posicao, byte_original, byte_descompactado);
+            identico = 0;
+            break;
+        }
+        
+        posicao++;
+    }
+    
+    if (identico) {
+        printf("✅ DESCOMPACTAÇÃO PERFEITA! Arquivos são IDÊNTICOS.\n");
+        printf("✅ Todos os %ld bytes conferem!\n", posicao);
+    } else {
+        printf("❌ ERRO NA DESCOMPACTAÇÃO! Arquivos diferentes.\n");
+    }
+    
+    fclose(arq_original);
+    fclose(arq_descompactado);
+}
+
 // Função principal atualizada
 int main() {
     setlocale(LC_ALL, "Portuguese");
@@ -659,14 +852,14 @@ int main() {
     const char* texto_teste = "Vamos aprender programação";
     
     // Criar arquivo temporário para teste
-    FILE* arquivo_teste = fopen("teste.txt", "wb");
+    FILE* arquivo_teste = fopen("teste.bin", "wb");
     if (arquivo_teste != NULL) {
-        fwrite(texto_teste, sizeof(char), strlen(texto_teste), arquivo_teste);
+        fwrite(texto_teste, 1, strlen(texto_teste), arquivo_teste);
         fclose(arquivo_teste);
     }
     
     // Abrir arquivo em modo binário
-    char* nomeArquivo = "teste.txt";
+    char* nomeArquivo = "teste.bin";
     FILE* arquivo = fopen(nomeArquivo, "rb");
     
     if (arquivo == NULL) {
@@ -688,10 +881,6 @@ int main() {
         return 1;
     }
     
-    // PRINT 1: Lista de frequência
-    printf("\n");
-    imprimirListaFrequencia(lista);
-    
     // PARTE 2: Construir árvore de Huffman
     struct No* raiz = construirArvoreHuffman(lista);
     
@@ -702,11 +891,6 @@ int main() {
         return 1;
     }
     
-    // PRINT 2: Árvore em pré-ordem
-    printf("\n=== ÁRVORE EM PRÉ-ORDEM ===\n");
-    imprimirArvorePreOrdem(raiz);
-    printf("\n");
-    
     // PARTE 3: Criar dicionário de códigos Huffman
     int altura;
     calcularAlturaArvore(raiz, &altura);
@@ -716,40 +900,28 @@ int main() {
     alocarDicionario(dicionario, colunas);
     gerarDicionario(dicionario, raiz, colunas);
     
-    // PRINT 3: Dicionário de códigos
-    printf("\n");
-    imprimirDicionario(dicionario);
-    
     // PARTE 4: Codificação
-    // PRINT 4: Texto codificado
-    printf("\n");
-    mostrarTextoCodificado(arquivo, dicionario);
-    
-    // Codificar e salvar em arquivo
-    codificarArquivo(arquivo, dicionario, "texto_codificado.txt");
+    codificarArquivo(arquivo, dicionario, "dados_codificados.bin");
     
     // Fechar arquivo de entrada
     fclose(arquivo);
 
     // PARTE 6: COMPACTAÇÃO COM CABEÇALHO
-    printf("\n");
-    compactarComCabecalho("texto_codificado.txt", raiz, "compactado.huff");
-    mostrarCabecalhoCompactado("compactado.huff");
+    compactarComCabecalho("dados_codificados.bin", raiz, "arquivo_compactado.huff");
     
-    // PARTE 5: Decodificação
-    // PRINT 5: Texto decodificado
-    printf("\n");
-    mostrarTextoDecodificado("texto_codificado.txt", raiz);
+    // PARTE 7: DESCOMPACTAÇÃO GERAL
+    descompactarArquivoGeral("arquivo_compactado.huff", raiz, "arquivo_descompactado.bin");
     
-    // Decodificar e salvar em arquivo
-    decodificarArquivo("texto_codificado.txt", raiz, "texto_decodificado.txt");
+    // VERIFICAÇÃO DA DESCOMPACTAÇÃO
+    verificarDescompactacao("teste.bin", "arquivo_descompactado.bin");
     
     // Liberar memória
     liberarDicionario(dicionario);
     liberarArvore(raiz);
     
-    // Remover arquivo temporário
-    remove("teste.txt");
+    // Remover arquivos temporários
+    remove("teste.bin");
+    remove("dados_codificados.bin");
     
     return 0;
 }
