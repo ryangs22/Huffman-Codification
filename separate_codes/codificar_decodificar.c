@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <locale.h>
 #include <string.h>
-/*
+
 /*
  ============================================================================
  PARTE 1: CRIAÇÃO DA LISTA ENCADEADA DE FREQUÊNCIA E ORDENAÇÃO CRESCENTE
